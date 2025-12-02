@@ -1,0 +1,283 @@
+// Endpoint Forensics - KQL Hunting Queries
+// Use these queries in Azure Log Analytics or Microsoft Sentinel
+
+//=============================================================================
+// COLLECTION HEALTH MONITORING
+//=============================================================================
+
+// Endpoints that haven't reported in the last 24 hours
+EndpointForensics_Heartbeat_CL
+| summarize LastSeen = max(TimeGenerated) by Computer, HostUUID
+| where LastSeen < ago(24h)
+| order by LastSeen asc
+
+// Collection errors by endpoint
+EndpointForensics_Heartbeat_CL
+| where ErrorCount > 0
+| summarize TotalErrors = sum(ErrorCount), Collections = count() by Computer
+| order by TotalErrors desc
+
+// Collection duration trends (identify slow endpoints)
+EndpointForensics_Heartbeat_CL
+| summarize AvgDuration = avg(CollectionDurationSeconds), 
+            MaxDuration = max(CollectionDurationSeconds),
+            Collections = count() 
+  by Computer
+| where AvgDuration > 120  // More than 2 minutes average
+| order by AvgDuration desc
+
+//=============================================================================
+// PERSISTENCE HUNTING - AUTORUNSC
+//=============================================================================
+
+// New persistence entries (not seen in previous 7 days)
+let baseline = EndpointForensics_Autorunsc_CL
+| where TimeGenerated between (ago(8d) .. ago(1d))
+| distinct Computer, EntryLocation, LaunchString, MD5;
+EndpointForensics_Autorunsc_CL
+| where TimeGenerated > ago(1d)
+| join kind=leftanti baseline on Computer, EntryLocation, LaunchString, MD5
+| project TimeGenerated, Computer, Category, Entry, Signer, ImagePath, LaunchString, MD5, SHA256
+
+// Unsigned autorun entries (potential malware)
+EndpointForensics_Autorunsc_CL
+| where TimeGenerated > ago(1d)
+| where Signer == "" or Signer == "(Not verified)" or Signer contains "error"
+| project TimeGenerated, Computer, Category, Entry, ImagePath, LaunchString, MD5
+| order by TimeGenerated desc
+
+// Autorun entries from user-writable paths
+EndpointForensics_Autorunsc_CL
+| where TimeGenerated > ago(1d)
+| where ImagePath matches regex @"(?i)(\\Users\\|\\Temp\\|\\AppData\\|\\Downloads\\)"
+| project TimeGenerated, Computer, Category, Entry, Signer, ImagePath, LaunchString, MD5
+| order by TimeGenerated desc
+
+// Rare autorun entries (appearing on < 5% of endpoints)
+let totalEndpoints = EndpointForensics_Autorunsc_CL
+| where TimeGenerated > ago(1d)
+| summarize EndpointCount = dcount(Computer);
+EndpointForensics_Autorunsc_CL
+| where TimeGenerated > ago(1d)
+| summarize EndpointsWithEntry = dcount(Computer) by MD5, Entry, ImagePath
+| extend Prevalence = EndpointsWithEntry * 100.0 / toscalar(totalEndpoints)
+| where Prevalence < 5
+| order by Prevalence asc
+
+//=============================================================================
+// NETWORK HUNTING
+//=============================================================================
+
+// External connections to rare ports (not 80, 443, 53)
+EndpointForensics_TcpConnections_CL
+| where TimeGenerated > ago(1d)
+| where State == "Established"
+| where RemotePort !in (80, 443, 53, 22, 3389)
+| where not(ipv4_is_private(RemoteAddress))
+| summarize Connections = count(), 
+            Endpoints = dcount(Computer) 
+  by RemoteAddress, RemotePort
+| order by Endpoints desc
+
+// Processes with outbound connections to rare IPs
+let knownGoodIPs = dynamic(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);  // Add your known good IPs
+EndpointForensics_TcpConnections_CL
+| where TimeGenerated > ago(1d)
+| where State == "Established"
+| where not(ipv4_is_private(RemoteAddress))
+| where RemoteAddress !in (knownGoodIPs)
+| join kind=inner (
+    EndpointForensics_Processes_CL
+    | where TimeGenerated > ago(1d)
+) on $left.OwningProcess == $right.ProcessId, Computer
+| summarize Connections = count() by ProcessName, RemoteAddress, RemotePort, ExecutablePath
+| order by Connections desc
+
+// Listening services on unusual ports
+EndpointForensics_TcpConnections_CL
+| where TimeGenerated > ago(1d)
+| where State == "Listen"
+| where LocalPort > 1024 and LocalPort < 49152
+| summarize Endpoints = dcount(Computer) by LocalPort, OwningProcess
+| order by Endpoints desc
+
+//=============================================================================
+// PROCESS HUNTING
+//=============================================================================
+
+// Processes running from temp directories
+EndpointForensics_Processes_CL
+| where TimeGenerated > ago(1d)
+| where ExecutablePath matches regex @"(?i)(\\Temp\\|\\tmp\\)"
+| project TimeGenerated, Computer, ProcessName, ProcessId, UserName, CommandLine, ExecutablePath
+| order by TimeGenerated desc
+
+// PowerShell with encoded commands
+EndpointForensics_Processes_CL
+| where TimeGenerated > ago(1d)
+| where ProcessName =~ "powershell" or ProcessName =~ "pwsh"
+| where CommandLine contains "-enc" or CommandLine contains "-EncodedCommand" or CommandLine contains "-e "
+| project TimeGenerated, Computer, ProcessName, UserName, CommandLine
+| order by TimeGenerated desc
+
+// Suspicious parent-child process relationships
+EndpointForensics_Processes_CL
+| where TimeGenerated > ago(1d)
+| join kind=inner (
+    EndpointForensics_Processes_CL
+    | where TimeGenerated > ago(1d)
+    | project ParentProcessId = ProcessId, ParentProcessName = ProcessName, Computer
+) on ParentProcessId, Computer
+| where (ParentProcessName =~ "winword" or ParentProcessName =~ "excel" or ParentProcessName =~ "outlook") 
+    and (ProcessName =~ "cmd" or ProcessName =~ "powershell" or ProcessName =~ "wscript" or ProcessName =~ "cscript")
+| project TimeGenerated, Computer, ParentProcessName, ProcessName, CommandLine, UserName
+
+// Processes without a Company name (potentially malicious)
+EndpointForensics_Processes_CL
+| where TimeGenerated > ago(1d)
+| where isempty(Company) or Company == ""
+| where ExecutablePath !startswith "C:\\Windows\\"
+| summarize Endpoints = dcount(Computer) by ProcessName, ExecutablePath
+| order by Endpoints desc
+
+//=============================================================================
+// USER & PRIVILEGE HUNTING
+//=============================================================================
+
+// New local admin group members
+let baseline = EndpointForensics_GroupMembers_CL
+| where TimeGenerated between (ago(8d) .. ago(1d))
+| where GroupName == "Administrators"
+| distinct Computer, MemberName, MemberSID;
+EndpointForensics_GroupMembers_CL
+| where TimeGenerated > ago(1d)
+| where GroupName == "Administrators"
+| join kind=leftanti baseline on Computer, MemberName, MemberSID
+| project TimeGenerated, Computer, GroupName, MemberName, MemberSID, ObjectClass
+
+// Disabled user accounts that became enabled
+let previouslyDisabled = EndpointForensics_Users_CL
+| where TimeGenerated between (ago(8d) .. ago(1d))
+| where Enabled == false
+| distinct Computer, Name, SID;
+EndpointForensics_Users_CL
+| where TimeGenerated > ago(1d)
+| where Enabled == true
+| join kind=inner previouslyDisabled on Computer, Name, SID
+| project TimeGenerated, Computer, Name, SID, LastLogon
+
+// New local user accounts
+let baselineUsers = EndpointForensics_Users_CL
+| where TimeGenerated between (ago(8d) .. ago(1d))
+| distinct Computer, SID;
+EndpointForensics_Users_CL
+| where TimeGenerated > ago(1d)
+| join kind=leftanti baselineUsers on Computer, SID
+| project TimeGenerated, Computer, Name, FullName, Enabled, SID, PrincipalSource
+
+//=============================================================================
+// SERVICE & SCHEDULED TASK HUNTING
+//=============================================================================
+
+// New services (not seen in baseline)
+let baselineServices = EndpointForensics_Services_CL
+| where TimeGenerated between (ago(8d) .. ago(1d))
+| distinct Computer, Name, PathName;
+EndpointForensics_Services_CL
+| where TimeGenerated > ago(1d)
+| join kind=leftanti baselineServices on Computer, Name, PathName
+| project TimeGenerated, Computer, Name, DisplayName, PathName, StartMode, StartName
+| order by TimeGenerated desc
+
+// Services running from suspicious paths
+EndpointForensics_Services_CL
+| where TimeGenerated > ago(1d)
+| where PathName matches regex @"(?i)(\\Users\\|\\Temp\\|\\AppData\\)"
+| project TimeGenerated, Computer, Name, DisplayName, PathName, StartName, State
+
+// New scheduled tasks (not in baseline)
+let baselineTasks = EndpointForensics_ScheduledTasks_CL
+| where TimeGenerated between (ago(8d) .. ago(1d))
+| distinct Computer, TaskPath, TaskName, Actions;
+EndpointForensics_ScheduledTasks_CL
+| where TimeGenerated > ago(1d)
+| join kind=leftanti baselineTasks on Computer, TaskPath, TaskName, Actions
+| project TimeGenerated, Computer, TaskName, TaskPath, Principal, Actions, State
+| order by TimeGenerated desc
+
+// Scheduled tasks running as SYSTEM
+EndpointForensics_ScheduledTasks_CL
+| where TimeGenerated > ago(1d)
+| where Principal contains "SYSTEM" or RunLevel == "Highest"
+| where TaskPath !startswith "\\Microsoft\\"  // Exclude built-in Microsoft tasks
+| project TimeGenerated, Computer, TaskName, TaskPath, Principal, RunLevel, Actions
+
+//=============================================================================
+// INSTALLED SOFTWARE HUNTING
+//=============================================================================
+
+// Recently installed software (InstallDate in last 7 days)
+EndpointForensics_InstalledSoftware_CL
+| where TimeGenerated > ago(1d)
+| where InstallDate != ""
+| extend InstallDateParsed = todatetime(strcat(substring(InstallDate, 0, 4), "-", substring(InstallDate, 4, 2), "-", substring(InstallDate, 6, 2)))
+| where InstallDateParsed > ago(7d)
+| project TimeGenerated, Computer, DisplayName, DisplayVersion, Publisher, InstallDateParsed
+| order by InstallDateParsed desc
+
+// Rare software (installed on < 3% of endpoints)
+let totalEndpoints = EndpointForensics_InstalledSoftware_CL
+| where TimeGenerated > ago(1d)
+| summarize EndpointCount = dcount(Computer);
+EndpointForensics_InstalledSoftware_CL
+| where TimeGenerated > ago(1d)
+| summarize EndpointsWithSoftware = dcount(Computer) by DisplayName, Publisher
+| extend Prevalence = EndpointsWithSoftware * 100.0 / toscalar(totalEndpoints)
+| where Prevalence < 3
+| order by Prevalence asc
+
+// Remote access tools
+EndpointForensics_InstalledSoftware_CL
+| where TimeGenerated > ago(1d)
+| where DisplayName matches regex @"(?i)(teamviewer|anydesk|ammyy|logmein|screenconnect|bomgar|dameware|radmin|vnc|remote.?desktop)"
+| project TimeGenerated, Computer, DisplayName, DisplayVersion, Publisher
+| order by DisplayName
+
+//=============================================================================
+// CROSS-TABLE CORRELATION
+//=============================================================================
+
+// Endpoints with both suspicious autorun AND rare software
+let suspiciousAutorun = EndpointForensics_Autorunsc_CL
+| where TimeGenerated > ago(1d)
+| where Signer == "" or Signer contains "Not verified"
+| distinct Computer;
+let rareSoftware = EndpointForensics_InstalledSoftware_CL
+| where TimeGenerated > ago(1d)
+| summarize EndpointCount = dcount(Computer) by DisplayName
+| where EndpointCount < 3
+| join kind=inner (
+    EndpointForensics_InstalledSoftware_CL
+    | where TimeGenerated > ago(1d)
+) on DisplayName
+| distinct Computer;
+suspiciousAutorun
+| join kind=inner rareSoftware on Computer
+| distinct Computer
+
+// Processes with external connections that also have persistence
+EndpointForensics_TcpConnections_CL
+| where TimeGenerated > ago(1d)
+| where State == "Established"
+| where not(ipv4_is_private(RemoteAddress))
+| join kind=inner (
+    EndpointForensics_Processes_CL
+    | where TimeGenerated > ago(1d)
+) on $left.OwningProcess == $right.ProcessId, Computer
+| join kind=inner (
+    EndpointForensics_Autorunsc_CL
+    | where TimeGenerated > ago(1d)
+) on $left.ExecutablePath == $right.ImagePath, Computer
+| project TimeGenerated, Computer, ProcessName, ExecutablePath, RemoteAddress, RemotePort, 
+          Category, Entry, Signer
+| order by TimeGenerated desc

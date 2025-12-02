@@ -1,0 +1,368 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "Creates custom tables in Log Analytics workspace for Endpoint Forensics data"
+  },
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Log Analytics workspace"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for the workspace"
+      }
+    }
+  },
+  "variables": {
+    "standardColumns": [
+      {
+        "name": "TimeGenerated",
+        "type": "datetime",
+        "description": "Time the record was generated (UTC)"
+      },
+      {
+        "name": "Computer",
+        "type": "string",
+        "description": "Computer name where data was collected"
+      },
+      {
+        "name": "HostUUID",
+        "type": "string",
+        "description": "Unique identifier for the host"
+      },
+      {
+        "name": "SnapshotId",
+        "type": "string",
+        "description": "Unique identifier for this collection run"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/EndpointForensics_Heartbeat_CL')]",
+      "properties": {
+        "schema": {
+          "name": "EndpointForensics_Heartbeat_CL",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime" },
+            { "name": "Computer", "type": "string" },
+            { "name": "HostUUID", "type": "string" },
+            { "name": "SnapshotId", "type": "string" },
+            { "name": "ScriptVersion", "type": "string" },
+            { "name": "CollectionStartTime", "type": "datetime" },
+            { "name": "CollectionEndTime", "type": "datetime" },
+            { "name": "CollectionDurationSeconds", "type": "real" },
+            { "name": "ErrorCount", "type": "int" },
+            { "name": "AutorunscAvailable", "type": "boolean" },
+            { "name": "OutboxPath", "type": "string" }
+          ]
+        },
+        "retentionInDays": 90
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/EndpointForensics_ComputerInfo_CL')]",
+      "properties": {
+        "schema": {
+          "name": "EndpointForensics_ComputerInfo_CL",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime" },
+            { "name": "Computer", "type": "string" },
+            { "name": "HostUUID", "type": "string" },
+            { "name": "SnapshotId", "type": "string" },
+            { "name": "CsName", "type": "string" },
+            { "name": "CsDNSHostName", "type": "string" },
+            { "name": "CsDomain", "type": "string" },
+            { "name": "CsManufacturer", "type": "string" },
+            { "name": "CsModel", "type": "string" },
+            { "name": "CsPartOfDomain", "type": "boolean" },
+            { "name": "CsPCSystemType", "type": "string" },
+            { "name": "OsName", "type": "string" },
+            { "name": "OsType", "type": "string" },
+            { "name": "OsVersion", "type": "string" },
+            { "name": "OsBuildNumber", "type": "string" },
+            { "name": "OsArchitecture", "type": "string" },
+            { "name": "OsSystemDrive", "type": "string" },
+            { "name": "OsLastBootUpTime", "type": "datetime" },
+            { "name": "OsInstallDate", "type": "datetime" },
+            { "name": "BiosVersion", "type": "string" },
+            { "name": "BiosSerialNumber", "type": "string" },
+            { "name": "CsProcessors", "type": "string" },
+            { "name": "CsNumberOfProcessors", "type": "int" },
+            { "name": "CsNumberOfLogicalProcessors", "type": "int" },
+            { "name": "CsTotalPhysicalMemory", "type": "long" },
+            { "name": "TimeZone", "type": "string" }
+          ]
+        },
+        "retentionInDays": 90
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/EndpointForensics_Processes_CL')]",
+      "properties": {
+        "schema": {
+          "name": "EndpointForensics_Processes_CL",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime" },
+            { "name": "Computer", "type": "string" },
+            { "name": "HostUUID", "type": "string" },
+            { "name": "SnapshotId", "type": "string" },
+            { "name": "ProcessId", "type": "int" },
+            { "name": "ProcessName", "type": "string" },
+            { "name": "ParentProcessId", "type": "int" },
+            { "name": "UserName", "type": "string" },
+            { "name": "CommandLine", "type": "string" },
+            { "name": "ExecutablePath", "type": "string" },
+            { "name": "StartTime", "type": "datetime" },
+            { "name": "WorkingSet", "type": "long" },
+            { "name": "CPU", "type": "real" },
+            { "name": "HandleCount", "type": "int" },
+            { "name": "ThreadCount", "type": "int" },
+            { "name": "Company", "type": "string" },
+            { "name": "ProductVersion", "type": "string" },
+            { "name": "FileVersion", "type": "string" },
+            { "name": "Description", "type": "string" }
+          ]
+        },
+        "retentionInDays": 90
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/EndpointForensics_TcpConnections_CL')]",
+      "properties": {
+        "schema": {
+          "name": "EndpointForensics_TcpConnections_CL",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime" },
+            { "name": "Computer", "type": "string" },
+            { "name": "HostUUID", "type": "string" },
+            { "name": "SnapshotId", "type": "string" },
+            { "name": "LocalAddress", "type": "string" },
+            { "name": "LocalPort", "type": "int" },
+            { "name": "RemoteAddress", "type": "string" },
+            { "name": "RemotePort", "type": "int" },
+            { "name": "State", "type": "string" },
+            { "name": "OwningProcess", "type": "int" },
+            { "name": "CreationTime", "type": "datetime" },
+            { "name": "OffloadState", "type": "string" }
+          ]
+        },
+        "retentionInDays": 90
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/EndpointForensics_Autorunsc_CL')]",
+      "properties": {
+        "schema": {
+          "name": "EndpointForensics_Autorunsc_CL",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime" },
+            { "name": "Computer", "type": "string" },
+            { "name": "HostUUID", "type": "string" },
+            { "name": "SnapshotId", "type": "string" },
+            { "name": "EntryLocation", "type": "string" },
+            { "name": "Entry", "type": "string" },
+            { "name": "Enabled", "type": "string" },
+            { "name": "Category", "type": "string" },
+            { "name": "Profile", "type": "string" },
+            { "name": "Description", "type": "string" },
+            { "name": "Signer", "type": "string" },
+            { "name": "Company", "type": "string" },
+            { "name": "ImagePath", "type": "string" },
+            { "name": "Version", "type": "string" },
+            { "name": "LaunchString", "type": "string" },
+            { "name": "MD5", "type": "string" },
+            { "name": "SHA1", "type": "string" },
+            { "name": "PESHA1", "type": "string" },
+            { "name": "PESHA256", "type": "string" },
+            { "name": "SHA256", "type": "string" },
+            { "name": "IMP", "type": "string" }
+          ]
+        },
+        "retentionInDays": 90
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/EndpointForensics_Services_CL')]",
+      "properties": {
+        "schema": {
+          "name": "EndpointForensics_Services_CL",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime" },
+            { "name": "Computer", "type": "string" },
+            { "name": "HostUUID", "type": "string" },
+            { "name": "SnapshotId", "type": "string" },
+            { "name": "Name", "type": "string" },
+            { "name": "DisplayName", "type": "string" },
+            { "name": "Description", "type": "string" },
+            { "name": "State", "type": "string" },
+            { "name": "Status", "type": "string" },
+            { "name": "StartMode", "type": "string" },
+            { "name": "StartName", "type": "string" },
+            { "name": "PathName", "type": "string" },
+            { "name": "ProcessId", "type": "int" },
+            { "name": "ServiceType", "type": "string" },
+            { "name": "AcceptPause", "type": "boolean" },
+            { "name": "AcceptStop", "type": "boolean" },
+            { "name": "DelayedAutoStart", "type": "boolean" }
+          ]
+        },
+        "retentionInDays": 90
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/EndpointForensics_ScheduledTasks_CL')]",
+      "properties": {
+        "schema": {
+          "name": "EndpointForensics_ScheduledTasks_CL",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime" },
+            { "name": "Computer", "type": "string" },
+            { "name": "HostUUID", "type": "string" },
+            { "name": "SnapshotId", "type": "string" },
+            { "name": "TaskName", "type": "string" },
+            { "name": "TaskPath", "type": "string" },
+            { "name": "State", "type": "string" },
+            { "name": "Description", "type": "string" },
+            { "name": "Author", "type": "string" },
+            { "name": "Date", "type": "string" },
+            { "name": "URI", "type": "string" },
+            { "name": "Principal", "type": "string" },
+            { "name": "RunLevel", "type": "string" },
+            { "name": "LogonType", "type": "string" },
+            { "name": "Actions", "type": "string" },
+            { "name": "Triggers", "type": "string" },
+            { "name": "LastRunTime", "type": "datetime" },
+            { "name": "LastTaskResult", "type": "int" },
+            { "name": "NextRunTime", "type": "datetime" },
+            { "name": "NumberOfMissedRuns", "type": "int" }
+          ]
+        },
+        "retentionInDays": 90
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/EndpointForensics_Users_CL')]",
+      "properties": {
+        "schema": {
+          "name": "EndpointForensics_Users_CL",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime" },
+            { "name": "Computer", "type": "string" },
+            { "name": "HostUUID", "type": "string" },
+            { "name": "SnapshotId", "type": "string" },
+            { "name": "Name", "type": "string" },
+            { "name": "FullName", "type": "string" },
+            { "name": "Description", "type": "string" },
+            { "name": "Enabled", "type": "boolean" },
+            { "name": "LastLogon", "type": "datetime" },
+            { "name": "PasswordLastSet", "type": "datetime" },
+            { "name": "PasswordExpires", "type": "datetime" },
+            { "name": "UserMayChangePassword", "type": "boolean" },
+            { "name": "PasswordRequired", "type": "boolean" },
+            { "name": "AccountExpires", "type": "datetime" },
+            { "name": "PrincipalSource", "type": "string" },
+            { "name": "SID", "type": "string" }
+          ]
+        },
+        "retentionInDays": 90
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/EndpointForensics_InstalledSoftware_CL')]",
+      "properties": {
+        "schema": {
+          "name": "EndpointForensics_InstalledSoftware_CL",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime" },
+            { "name": "Computer", "type": "string" },
+            { "name": "HostUUID", "type": "string" },
+            { "name": "SnapshotId", "type": "string" },
+            { "name": "DisplayName", "type": "string" },
+            { "name": "DisplayVersion", "type": "string" },
+            { "name": "Publisher", "type": "string" },
+            { "name": "InstallDate", "type": "string" },
+            { "name": "InstallLocation", "type": "string" },
+            { "name": "UninstallString", "type": "string" },
+            { "name": "QuietUninstallString", "type": "string" },
+            { "name": "EstimatedSize", "type": "int" },
+            { "name": "RegistryPath", "type": "string" }
+          ]
+        },
+        "retentionInDays": 90
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/EndpointForensics_NetworkAdapters_CL')]",
+      "properties": {
+        "schema": {
+          "name": "EndpointForensics_NetworkAdapters_CL",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime" },
+            { "name": "Computer", "type": "string" },
+            { "name": "HostUUID", "type": "string" },
+            { "name": "SnapshotId", "type": "string" },
+            { "name": "InterfaceIndex", "type": "int" },
+            { "name": "Name", "type": "string" },
+            { "name": "InterfaceDescription", "type": "string" },
+            { "name": "MacAddress", "type": "string" },
+            { "name": "Status", "type": "string" },
+            { "name": "LinkSpeed", "type": "string" },
+            { "name": "MediaType", "type": "string" },
+            { "name": "PhysicalMediaType", "type": "string" },
+            { "name": "DriverVersion", "type": "string" },
+            { "name": "DriverDate", "type": "datetime" },
+            { "name": "Virtual", "type": "boolean" },
+            { "name": "Hidden", "type": "boolean" },
+            { "name": "ConnectionSpecificSuffix", "type": "string" },
+            { "name": "RegisterThisConnectionsAddress", "type": "boolean" }
+          ]
+        },
+        "retentionInDays": 90
+      }
+    }
+  ],
+  "outputs": {
+    "tablesCreated": {
+      "type": "array",
+      "value": [
+        "EndpointForensics_Heartbeat_CL",
+        "EndpointForensics_ComputerInfo_CL",
+        "EndpointForensics_Processes_CL",
+        "EndpointForensics_TcpConnections_CL",
+        "EndpointForensics_Autorunsc_CL",
+        "EndpointForensics_Services_CL",
+        "EndpointForensics_ScheduledTasks_CL",
+        "EndpointForensics_Users_CL",
+        "EndpointForensics_InstalledSoftware_CL",
+        "EndpointForensics_NetworkAdapters_CL"
+      ]
+    }
+  }
+}
