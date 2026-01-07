@@ -8,7 +8,7 @@ A distributed, agent-based approach using Azure Monitor Agent (AMA) and Data Col
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              WINDOWS ENDPOINT                                    │
+│                              WINDOWS ENDPOINT                                   │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐│
 │  │                     Scheduled Task (SYSTEM, every 4-24h)                    ││
 │  │  ┌───────────────────────────────────────────────────────────────────────┐  ││
@@ -18,16 +18,16 @@ A distributed, agent-based approach using Azure Monitor Agent (AMA) and Data Col
 │  │  │  • Generates NDJSON files per data category                           │  ││
 │  │  └───────────────────────────────────────────────────────────────────────┘  ││
 │  └─────────────────────────────────────────────────────────────────────────────┘│
-│                                      │                                           │
-│                                      ▼                                           │
+│                                      │                                          │
+│                                      ▼                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐│
 │  │              C:\ProgramData\EndpointForensics\outbox\                       ││
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           ││
+│  │  ┌──────────────┐ ┌──────────────┐ ┌─────────────┐ ┌─────────────┐          ││
 │  │  │Autorunsc.json│ │Processes.json│ │TcpConn.json │ │ Users.json  │  ...     ││
-│  │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘           ││
+│  │  └──────────────┘ └──────────────┘ └─────────────┘ └─────────────┘          ││
 │  └─────────────────────────────────────────────────────────────────────────────┘│
-│                                      │                                           │
-│                                      ▼                                           │
+│                                      │                                          │
+│                                      ▼                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐│
 │  │                      Azure Monitor Agent (AMA)                              ││
 │  │  • Watches outbox folder for *.ndjson files                                 ││
@@ -38,29 +38,29 @@ A distributed, agent-based approach using Azure Monitor Agent (AMA) and Data Col
                                        │
                                        ▼ (HTTPS/TLS 1.2+)
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                                    AZURE                                         │
+│                                    AZURE                                        │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐│
 │  │                   Data Collection Rule (DCR)                                ││
 │  │  • Custom JSON Logs data source                                             ││
 │  │  • Transformation: maps fields, adds TimeGenerated                          ││
-│  │  • Routes to appropriate custom tables                                       ││
+│  │  • Routes to appropriate custom tables                                      ││
 │  └─────────────────────────────────────────────────────────────────────────────┘│
-│                                      │                                           │
-│                                      ▼                                           │
+│                                      │                                          │
+│                                      ▼                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐│
 │  │                     Log Analytics Workspace                                 ││
-│  │  ┌─────────────────────────────────────────────────────────────────────┐   ││
+│  │  ┌──────────────────────────────────────────────────────────────────────┐   ││
 │  │  │ Custom Tables:                                                       │   ││
-│  │  │  • EndpointForensics_Autorunsc_CL                                   │   ││
-│  │  │  • EndpointForensics_Processes_CL                                   │   ││
-│  │  │  • EndpointForensics_TcpConnections_CL                              │   ││
-│  │  │  • EndpointForensics_Users_CL                                       │   ││
-│  │  │  • EndpointForensics_NetworkAdapters_CL                             │   ││
-│  │  │  • ... (one per data category)                                      │   ││
-│  │  └─────────────────────────────────────────────────────────────────────┘   ││
+│  │  │  • EndpointForensics_Autorunsc_CL                                    │   ││
+│  │  │  • EndpointForensics_Processes_CL                                    │   ││
+│  │  │  • EndpointForensics_TcpConnections_CL                               │   ││
+│  │  │  • EndpointForensics_Users_CL                                        │   ││
+│  │  │  • EndpointForensics_NetworkAdapters_CL                              │   ││
+│  │  │  • ... (one per data category)                                       │   ││
+│  │  └──────────────────────────────────────────────────────────────────────┘   ││
 │  └─────────────────────────────────────────────────────────────────────────────┘│
-│                                      │                                           │
-│                                      ▼                                           │
+│                                      │                                          │
+│                                      ▼                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐│
 │  │                     Analytics & Hunting                                     ││
 │  │  • Azure Sentinel (SIEM)                                                    ││
